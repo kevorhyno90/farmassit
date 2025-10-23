@@ -5,6 +5,9 @@ export type Crop = {
   plantingDate: string;
   stage: 'Planted' | 'Germination' | 'Vegetative' | 'Flowering' | 'Harvest';
   expectedHarvest: string;
+  // optional linkage to a field and treatment history
+  fieldId?: string;
+  treatments?: Treatment[];
 };
 
 export const cropData: Crop[] = [
@@ -62,4 +65,31 @@ export const taskData: FarmTask[] = [
   { id: 'T003', task: 'Spray tomatoes for blight', dueDate: '2024-07-23', status: 'Pending', assignee: 'John D.' },
   { id: 'T004', task: 'Order more cattle feed', dueDate: '2024-07-25', status: 'Pending', assignee: 'Admin' },
   { id: 'T005', task: 'Harvest Winter Wheat', dueDate: '2024-07-28', status: 'Pending', assignee: 'All Hands' },
+];
+
+export type Treatment = {
+  id: string;
+  date: string;
+  type: 'Fertilizer' | 'Pesticide' | 'Irrigation' | 'Other';
+  product?: string;
+  rate?: string;
+  notes?: string;
+};
+
+export const treatmentData: Treatment[] = [
+  { id: 'TR001', date: '2024-06-01', type: 'Fertilizer', product: 'NPK 10-10-10', rate: '50 kg/ha', notes: 'Pre-planting' },
+  { id: 'TR002', date: '2024-07-01', type: 'Pesticide', product: 'Alpha', rate: '1 L/ha', notes: 'Targeted at blight' },
+];
+
+export type Field = {
+  id: string;
+  name: string;
+  areaHa: number;
+  soilType?: string;
+  notes?: string;
+};
+
+export const fieldData: Field[] = [
+  { id: 'F001', name: 'North Field', areaHa: 12.5, soilType: 'Loam', notes: 'Good drainage' },
+  { id: 'F002', name: 'South Field', areaHa: 8.0, soilType: 'Clay', notes: 'Irrigation required' },
 ];

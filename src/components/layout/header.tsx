@@ -31,7 +31,7 @@ export function Header() {
       const name = part.charAt(0).toUpperCase() + part.slice(1).replace(/-/g, " ");
       return { href, name, isLast };
     });
-    return [{ href: "/dashboard", name: "Home", isLast: parts.length === 0 }, ...items];
+  return [{ href: "/", name: "Home", isLast: parts.length === 0 }, ...items];
   }, [pathname]);
 
 
