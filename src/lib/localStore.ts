@@ -8,8 +8,12 @@ export async function loadDataRemote<T>(resource: string, fallback: T): Promise<
 
 export function loadData<T>(key: string, fallback: T): T {
   try {
-    if (typeof window === "undefined" || !window.localStorage) return fallback;
-    const raw = localStorage.getItem(key);
+    // support both browser and Node test env (globalThis.localStorage)
+    const storage: Storage | undefined = (typeof window !== "undefined" && window.localStorage)
+      ? window.localStorage
+      : (typeof globalThis !== "undefined" ? (globalThis as Record<string, unknown>).localStorage as Storage | undefined : undefined);
+    if (!storage) return fallback;
+    const raw = storage.getItem(key);
     if (!raw) return fallback;
     return JSON.parse(raw) as T;
   } catch (e) {
@@ -20,8 +24,11 @@ export function loadData<T>(key: string, fallback: T): T {
 
 export async function saveData<T>(key: string, data: T, resource?: string) {
   try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      localStorage.setItem(key, JSON.stringify(data));
+    const storage: Storage | undefined = (typeof window !== "undefined" && window.localStorage)
+      ? window.localStorage
+      : (typeof globalThis !== "undefined" ? (globalThis as Record<string, unknown>).localStorage as Storage | undefined : undefined);
+    if (storage) {
+      storage.setItem(key, JSON.stringify(data));
     }
   } catch (e) {
     console.error('saveData error', e);

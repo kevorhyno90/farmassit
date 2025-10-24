@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { loadData, saveData } from "@/lib/localStore";
 import { plantingData as samplePlantings, type Planting } from "@/lib/data";
@@ -28,7 +28,7 @@ export default function PlantingsPage() {
           setPlantings(data);
           return;
         }
-      } catch (e) {
+      } catch {
         // fallback
       }
       setPlantings(loadData<Planting[]>('farmassit.plantings.v1', samplePlantings));
@@ -41,7 +41,7 @@ export default function PlantingsPage() {
           setOperations(data);
           return;
         }
-      } catch (e) {
+      } catch {
         // fallback
       }
       setOperations(loadData<Operation[]>('farmassit.operations.v1', sampleOperations));

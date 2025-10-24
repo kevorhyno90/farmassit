@@ -28,3 +28,4 @@ https://nextjs.org/telemetry
  HEAD /api/data/operations 200 in 431ms
  ✓ Compiled /api/data/tasks in 173ms
  HEAD /api/data/tasks 200 in 439ms
+ ✓ Compiled in 170ms
