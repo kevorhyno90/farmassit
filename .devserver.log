@@ -1,0 +1,120 @@
+
+> nextn@0.1.0 dev
+> next dev --turbopack -p 9002
+
+   ▲ Next.js 15.5.6 (Turbopack)
+   - Local:        http://localhost:9002
+   - Network:      http://10.0.2.1:9002
+
+ ✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+ ✓ Ready in 1177ms
+ ○ Compiling / ...
+ ✓ Compiled / in 6.7s
+ GET / 307 in 7397ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1596ms
+ GET /dashboard 200 in 1953ms
+ ✓ Compiled /crops/fields in 499ms
+ HEAD /crops/fields 200 in 692ms
+ GET / 307 in 176ms
+ GET /dashboard 200 in 185ms
+ GET /dashboard 200 in 286ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 689ms
+ GET /favicon.ico?favicon.7ed73651.ico 200 in 990ms
+ ○ Compiling /crops ...
+ ✓ Compiled /crops in 1193ms
+ GET /crops 200 in 1285ms
+ GET /crops 200 in 75ms
+ ○ Compiling /api/data/fields ...
+ ✓ Compiled /api/data/fields in 672ms
+ PUT /api/data/treatments 200 in 889ms
+ PUT /api/data/treatments 200 in 919ms
+ PUT /api/data/treatments 200 in 978ms
+ PUT /api/data/fields 200 in 921ms
+ PUT /api/data/fields 200 in 1026ms
+ PUT /api/data/fields 200 in 893ms
+ GET /api/data/crops 200 in 970ms
+ GET /api/data/crops 200 in 322ms
+ GET /api/data/fields 200 in 325ms
+ PUT /api/data/crops 200 in 316ms
+ GET /api/data/treatments 200 in 349ms
+ GET /api/data/fields 200 in 348ms
+ PUT /api/data/crops 200 in 254ms
+ PUT /api/data/fields 200 in 266ms
+ PUT /api/data/treatments 200 in 282ms
+ GET /api/data/treatments 200 in 276ms
+ PUT /api/data/crops 200 in 248ms
+ PUT /api/data/fields 200 in 264ms
+ PUT /api/data/treatments 200 in 287ms
+ PUT /api/data/crops 200 in 253ms
+ PUT /api/data/crops 200 in 261ms
+ ✓ Compiled /crops/[section] in 429ms
+ GET /crops/reports 200 in 1013ms
+ GET /api/data/crops 200 in 512ms
+ PUT /api/data/fields 200 in 732ms
+ ○ Compiling /crops/plantings ...
+ GET /crops/reports 200 in 668ms
+ PUT /api/data/fields 200 in 819ms
+ PUT /api/data/treatments 200 in 821ms
+ PUT /api/data/fields 200 in 866ms
+ PUT /api/data/treatments 200 in 842ms
+ PUT /api/data/treatments 200 in 814ms
+ GET /crops/reports 200 in 312ms
+ PUT /api/data/crops 200 in 607ms
+ GET /api/data/fields 200 in 619ms
+ ✓ Compiled /crops/plantings in 1446ms
+ GET /crops/plantings 200 in 1613ms
+ PUT /api/data/crops 200 in 451ms
+ GET /api/data/treatments 200 in 416ms
+ PUT /api/data/fields 200 in 313ms
+ GET /api/data/crops 200 in 254ms
+ PUT /api/data/treatments 200 in 264ms
+ ○ Compiling /_not-found/page ...
+ ✓ Compiled /_not-found/page in 578ms
+ PUT /api/data/crops 200 in 412ms
+ GET /api/data/fields 200 in 402ms
+ GET /api/data/plantings 404 in 807ms
+ PUT /api/data/plantings 404 in 855ms
+ GET /api/data/operations 404 in 823ms
+ GET /api/data/plantings 404 in 138ms
+ PUT /api/data/crops 200 in 309ms
+ GET /api/data/treatments 200 in 303ms
+ GET /api/data/operations 404 in 120ms
+ PUT /api/data/plantings 404 in 273ms
+ PUT /api/data/plantings 404 in 279ms
+ PUT /api/data/plantings 404 in 433ms
+ PUT /api/data/operations 404 in 574ms
+ PUT /api/data/operations 404 in 568ms
+ PUT /api/data/operations 404 in 580ms
+ PUT /api/data/operations 404 in 571ms
+ GET /api/data/crops 200 in 351ms
+ GET /crops/reports 200 in 397ms
+ PUT /api/data/treatments 200 in 510ms
+ PUT /api/data/fields 200 in 641ms
+ PUT /api/data/treatments 200 in 641ms
+ PUT /api/data/fields 200 in 646ms
+ PUT /api/data/treatments 200 in 638ms
+ PUT /api/data/fields 200 in 641ms
+ GET /crops/reports 200 in 324ms
+ PUT /api/data/crops 200 in 508ms
+ GET /api/data/fields 200 in 509ms
+ PUT /api/data/crops 200 in 341ms
+ GET /api/data/treatments 200 in 353ms
+ PUT /api/data/fields 200 in 310ms
+ GET /api/data/crops 200 in 257ms
+ PUT /api/data/treatments 200 in 255ms
+ PUT /api/data/crops 200 in 318ms
+ GET /api/data/fields 200 in 311ms
+ PUT /api/data/crops 200 in 269ms
+ PUT /api/data/crops 200 in 292ms
+ GET /api/data/treatments 200 in 294ms
+ PUT /api/data/fields 200 in 256ms
+ PUT /api/data/treatments 200 in 250ms
+ GET /crops/reports 200 in 104ms
+ GET /crops/reports 200 in 99ms

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -75,13 +76,15 @@ function exportCSV(crops: Crop[]) {
 }
 
 export default function CropsManager({ initialSection } : { initialSection?: string }) {
-  const [crops, setCrops] = useState<Crop[]>(() => loadData<Crop[]>(STORAGE_KEY, cropData));
+  // Use deterministic initial data (matches server-rendered fallback) to avoid hydration
+  // mismatches. Local storage / remote data will be loaded after mount.
+  const [crops, setCrops] = useState<Crop[]>(() => cropData);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCrop, setEditingCrop] = useState<Crop | null>(null);
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [fields, setFields] = useState<Field[]>(() => loadData<Field[]>(STORAGE_FIELDS, sampleFields));
-  const [treatments, setTreatments] = useState<Treatment[]>(() => loadData<Treatment[]>(STORAGE_TREATMENTS, sampleTreatments));
+  const [fields, setFields] = useState<Field[]>(() => sampleFields);
+  const [treatments, setTreatments] = useState<Treatment[]>(() => sampleTreatments);
 
   // try remote load on mount
   useEffect(() => {
@@ -99,21 +102,35 @@ export default function CropsManager({ initialSection } : { initialSection?: str
     })();
   }, []);
 
+  // After mount: if no remote data, prefer any saved local data (localStorage) to
+  // seed client state. We do this in a separate effect to avoid reading localStorage
+  // during server render which could cause hydration mismatches.
+  useEffect(() => {
+    try {
+      const localCrops = loadData<Crop[] | null>(STORAGE_KEY, null as any);
+      if (localCrops) setCrops(localCrops);
+      const localFields = loadData<Field[] | null>(STORAGE_FIELDS, null as any);
+      if (localFields) setFields(localFields);
+      const localTreat = loadData<Treatment[] | null>(STORAGE_TREATMENTS, null as any);
+      if (localTreat) setTreatments(localTreat);
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => { saveData(STORAGE_FIELDS, fields, 'fields'); }, [fields]);
   useEffect(() => { saveData(STORAGE_TREATMENTS, treatments, 'treatments'); }, [treatments]);
   useEffect(() => { saveData(STORAGE_KEY, crops, 'crops'); }, [crops]);
 
-  // If an initialSection prop is provided, scroll to it on mount
+  const router = useRouter();
+
+  // If an initialSection prop is provided (route), navigate to that route.
   useEffect(() => {
     if (initialSection) {
-      // slight delay to allow refs to be attached
-      setTimeout(() => {
-        const el = sectionRefs.current[initialSection];
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setActiveSection(initialSection);
-      }, 150);
+      // navigate to the per-section page so it's independent
+      router.replace(`/crops/${initialSection}`);
     }
-  }, [initialSection]);
+  }, [initialSection, router]);
 
   // Intersection observer to highlight active section and show dropdown of subsections
   useEffect(() => {
@@ -230,8 +247,8 @@ export default function CropsManager({ initialSection } : { initialSection?: str
 
   // Render helpers
   const scrollToSection = (id: string) => {
-    const el = sectionRefs.current[id];
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // navigate to the independent subsection page
+    router.push(`/crops/${id}`);
   };
 
   return (
@@ -276,224 +293,22 @@ export default function CropsManager({ initialSection } : { initialSection?: str
         </CardHeader>
       </Card>
 
-      {/* Overview */}
-  <section id="overview" ref={(el) => { sectionRefs.current["overview"] = el; }} className="space-y-2">
-        <h3 className="text-lg font-semibold">Overview</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
+      {/* Sections overview — each section is now an independent page */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {SECTIONS.map((s) => (
+          <Card key={s.id}>
+            <CardHeader>
+              <CardTitle>{s.label}</CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className="text-sm text-muted-foreground">Total crops</div>
-              <div className="text-2xl font-bold">{reportSummary.total}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">Fields (sample)</div>
-              <div className="text-2xl font-bold">{fieldCount}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">Stages</div>
-              <div className="flex gap-2 mt-2">
-                {reportSummary.byStage.map(s => (
-                  <Badge key={s.stage} variant="outline">{s.stage} ({s.count})</Badge>
-                ))}
+              <p className="text-sm text-muted-foreground">Open the independent page for {s.label}.</p>
+              <div className="mt-3">
+                <Button size="sm" onClick={() => router.push(`/crops/${s.id}`)}>{s.label}</Button>
               </div>
             </CardContent>
           </Card>
-        </div>
-      </section>
-
-      {/* Fields - management */}
-      <section id="fields" ref={(el) => { sectionRefs.current["fields"] = el; }} className="space-y-2">
-        <h3 className="text-lg font-semibold">Fields</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardContent>
-              <div className="mb-2 text-sm text-muted-foreground">Fields on the farm</div>
-              <div className="space-y-2">
-                {fields.map(f => (
-                  <div key={f.id} className="flex items-center justify-between gap-2 border rounded p-2">
-                    <div>
-                      <div className="font-medium">{f.name}</div>
-                      <div className="text-xs text-muted-foreground">{f.areaHa} ha — {f.soilType}</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => { const name = prompt('Field name', f.name); if (name) handleAddField({...f, name}); }}>Edit</Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDeleteField(f.id)}>Delete</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <div className="mb-2 text-sm text-muted-foreground">Add new field</div>
-              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); handleAddField({ id: `F${String(fields.length+1).padStart(3,'0')}`, name: String(fd.get('name')||''), areaHa: Number(fd.get('areaHa')||0), soilType: String(fd.get('soilType')||'') }); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
-                <Input name="name" placeholder="Field name" required />
-                <Input name="areaHa" type="number" placeholder="Area (ha)" required />
-                <Input name="soilType" placeholder="Soil type" />
-                <Button type="submit">Add Field</Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Varieties */}
-  <section id="varieties" ref={(el) => { sectionRefs.current["varieties"] = el; }} className="space-y-2">
-        <h3 className="text-lg font-semibold">Varieties</h3>
-        <Card>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Catalog of crop varieties. You can extend this list and link varieties to plantings.</p>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Plantings table (main editable grid) */}
-  <section id="plantings" ref={(el) => { sectionRefs.current["plantings"] = el; }} className="space-y-2">
-        <h3 className="text-lg font-semibold">Plantings</h3>
-        <Card>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden md:table-cell">Variety</TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead className="hidden md:table-cell">Planted</TableHead>
-                  <TableHead>Harvest</TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {crops.map((crop) => (
-                  <TableRow key={crop.id}>
-                    <TableCell className="font-medium">{crop.name}</TableCell>
-                    <TableCell className="hidden md:table-cell">{crop.variety}</TableCell>
-                    <TableCell><Badge variant="outline">{crop.stage}</Badge></TableCell>
-                    <TableCell className="hidden md:table-cell">{crop.plantingDate}</TableCell>
-                    <TableCell>{crop.expectedHarvest}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEdit(crop)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setQuickTreatmentCrop(crop.id); setIsQuickTreatmentOpen(true); }}><Sprout className="mr-2 h-4 w-4" /> Add Treatment</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(crop.id)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Tasks placeholder */}
-  <section id="tasks" ref={(el) => { sectionRefs.current["tasks"] = el; }} className="space-y-2">
-        <h3 className="text-lg font-semibold">Tasks</h3>
-        <Card>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Task scheduling and assignment (placeholder). Integrate with farm tasks and equipment.</p>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Treatments */}
-      <section id="treatments" ref={(el) => { sectionRefs.current["treatments"] = el; }} className="space-y-2">
-        <h3 className="text-lg font-semibold">Treatments</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardContent>
-              <div className="mb-2 text-sm text-muted-foreground">Treatments (global)</div>
-              <div className="space-y-2">
-                {treatments.map(t => (
-                  <div key={t.id} className="flex items-center justify-between gap-2 border rounded p-2">
-                    <div>
-                      <div className="font-medium">{t.type} — {t.product}</div>
-                      <div className="text-xs text-muted-foreground">{t.date} • {t.rate}</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => { const notes = prompt('Notes', t.notes||''); if (notes !== null) { handleAddTreatment({ ...t, notes }); } }}>Edit</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <div className="mb-2 text-sm text-muted-foreground">Add new treatment</div>
-              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: (fd.get('type') as any) || 'Other', product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
-                <Input name="date" type="date" required />
-                <Select name="type">
-                  <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Fertilizer">Fertilizer</SelectItem>
-                    <SelectItem value="Pesticide">Pesticide</SelectItem>
-                    <SelectItem value="Irrigation">Irrigation</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input name="product" placeholder="Product" />
-                <Input name="rate" placeholder="Rate" />
-                <Input name="notes" placeholder="Notes" />
-                <Button type="submit">Add Treatment</Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Reports */}
-      <section id="reports" ref={(el) => { sectionRefs.current["reports"] = el; }} className="space-y-2">
-        <h3 className="text-lg font-semibold">Reports</h3>
-        <Card>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="text-sm text-muted-foreground">Simple summary</div>
-              <div className="flex gap-3">
-                <div className="p-3 bg-muted rounded">
-                  <div className="text-xs text-muted-foreground">Total plantings</div>
-                  <div className="font-bold text-lg">{reportSummary.total}</div>
-                </div>
-                {reportSummary.byStage.map(s => (
-                  <div key={s.stage} className="p-3 bg-muted rounded">
-                    <div className="text-xs text-muted-foreground">{s.stage}</div>
-                    <div className="font-bold">{s.count}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="pt-3">
-                <div className="text-sm text-muted-foreground">Estimated GDD (placeholder)</div>
-                <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-                  {crops.map(c => (
-                    <div key={c.id} className="p-2 border rounded">
-                      <div className="font-medium">{c.name}</div>
-                      <div className="text-xs text-muted-foreground">Est. GDD: {estimateGDD(c) ?? '—'}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">Field: {fields.find(f => f.id === c.fieldId)?.name ?? '—'}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="pt-3">
-                <Button variant="outline" size="sm" onClick={() => exportCSV(crops)}>Export CSV</Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+        ))}
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>

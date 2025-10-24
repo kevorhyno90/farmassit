@@ -10,12 +10,14 @@ import PlantingEditor from "@/components/crops/PlantingEditor";
 import SimpleCalendar from "@/components/ui/SimpleCalendar";
 import OperationEditor from "@/components/crops/OperationEditor";
 import { operationData as sampleOperations, type Operation } from "@/lib/data";
+import BackButton from "@/components/ui/back-button";
 
 export default function PlantingsPage() {
-  const [plantings, setPlantings] = useState<Planting[]>([]);
+  // Start with sample data (matches server) and hydrate from local/remote after mount
+  const [plantings, setPlantings] = useState<Planting[]>(() => samplePlantings);
   const [editing, setEditing] = useState<Planting | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [operations, setOperations] = useState<Operation[]>([]);
+  const [operations, setOperations] = useState<Operation[]>(() => sampleOperations);
   const [opEditing, setOpEditing] = useState<Operation | null>(null);
   const [opOpen, setOpOpen] = useState(false);
 
@@ -63,7 +65,10 @@ export default function PlantingsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Plantings</h2>
+        <div className="flex items-center gap-3">
+          <BackButton />
+          <h2 className="text-lg font-semibold">Plantings</h2>
+        </div>
         <div className="flex items-center gap-2">
           <Button onClick={handleAdd}>Add Planting</Button>
         </div>
