@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { loadData, saveData } from "@/lib/localStore";
@@ -19,8 +19,10 @@ export default function PlantingsPage() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [opEditing, setOpEditing] = useState<Operation | null>(null);
   const [opOpen, setOpOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    setIsLoading(true);
     (async () => {
       try {
         const res = await fetch('/api/data/plantings');
@@ -46,7 +48,7 @@ export default function PlantingsPage() {
         // fallback
       }
       setOperations(loadData<Operation[]>('farmassit.operations.v1', sampleOperations));
-    })();
+    })().finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => { saveData('farmassit.plantings.v1', plantings, 'plantings'); }, [plantings]);
@@ -74,76 +76,154 @@ export default function PlantingsPage() {
   const handleSaveOperation = (o: Operation) => { setOperations(s => { const exists = s.find(x => x.id === o.id); if (exists) return s.map(x => x.id === o.id ? o : x); return [...s, o]; }); setOpOpen(false); };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Plantings</h2>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Crop Plantings</h2>
+          <p className="text-muted-foreground mt-1">
+            Manage your planting schedules and track field operations
+          </p>
+        </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleAdd}>Add Planting</Button>
+          <Button onClick={handleAdd} size="lg">+ Add Planting</Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <div className="mb-3">
-              <Input placeholder="Search plantings by id, crop, or field..." value={query} onChange={(e) => setQuery((e.target as HTMLInputElement).value)} />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-pulse text-muted-foreground">Loading plantings...</div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Planting Calendar</CardTitle>
+                  <CardDescription>
+                    Click on any date to view or edit planting details
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <Input 
+                      placeholder="🔍 Search plantings by ID, crop, or field..." 
+                      value={query} 
+                      onChange={(e) => setQuery((e.target as HTMLInputElement).value)}
+                      className="max-w-md"
+                    />
+                  </div>
+                  {filteredPlantings.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      {query ? 'No plantings match your search.' : 'No plantings yet. Add your first planting above!'}
+                    </div>
+                  ) : (
+                    <SimpleCalendar 
+                      items={filteredPlantings.map(p => ({ 
+                        id: p.id, 
+                        date: p.sowingDate || p.expectedHarvest || '', 
+                        title: p.cropId 
+                      }))} 
+                      onClickItem={(id) => { 
+                        const p = plantings.find(x => x.id === id); 
+                        if (p) handleEdit(p); 
+                      }} 
+                    />
+                  )}
+                </CardContent>
+              </Card>
             </div>
-            <SimpleCalendar items={filteredPlantings.map(p => ({ id: p.id, date: p.sowingDate || p.expectedHarvest || '', title: p.cropId }))} onClickItem={(id) => { const p = plantings.find(x => x.id === id); if (p) handleEdit(p); }} />
+
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Planned Operations</CardTitle>
+                      <CardDescription className="mt-1">
+                        Upcoming field activities
+                      </CardDescription>
+                    </div>
+                    <Button size="sm" onClick={handleAddOperation}>+ Add</Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {operations.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      No operations planned yet
+                    </div>
+                  ) : (
+                    <ul className="space-y-3">
+                      {operations.map(o => (
+                        <li key={o.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent transition-colors">
+                          <div className="flex-1">
+                            <div className="font-medium">{o.type}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {o.plannedDate || 'No date set'}
+                            </div>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={() => handleEditOperation(o)}>
+                            Edit
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">Planned Operations</h3>
-            <Button size="sm" onClick={handleAddOperation}>Add</Button>
-          </div>
+
           <Card>
+            <CardHeader>
+              <CardTitle>All Plantings</CardTitle>
+              <CardDescription>
+                Complete list of all crop plantings with details
+              </CardDescription>
+            </CardHeader>
             <CardContent>
-              <ul className="space-y-2">
-                {operations.map(o => (
-                  <li key={o.id} className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{o.type}</div>
-                      <div className="text-xs text-muted-foreground">{o.plannedDate}</div>
-                    </div>
-                    <div>
-                      <Button size="sm" onClick={() => handleEditOperation(o)}>Edit</Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              {filteredPlantings.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  {query ? 'No plantings match your search.' : 'No plantings to display.'}
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="font-semibold">ID</TableHead>
+                        <TableHead className="font-semibold">Crop</TableHead>
+                        <TableHead className="font-semibold">Field</TableHead>
+                        <TableHead className="font-semibold">Sowing Date</TableHead>
+                        <TableHead className="font-semibold">Expected Harvest</TableHead>
+                        <TableHead className="font-semibold text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPlantings.map(p => (
+                        <TableRow key={p.id} className="hover:bg-muted/50">
+                          <TableCell className="font-medium">{p.id}</TableCell>
+                          <TableCell>{p.cropId || '—'}</TableCell>
+                          <TableCell>{p.fieldId || '—'}</TableCell>
+                          <TableCell>{p.sowingDate || '—'}</TableCell>
+                          <TableCell>{p.expectedHarvest || '—'}</TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="outline" onClick={() => handleEdit(p)}>
+                              Edit
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </div>
-
-      <Card>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Crop</TableHead>
-                <TableHead>Field</TableHead>
-                <TableHead>Sowing</TableHead>
-                <TableHead>Harvest</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-                {filteredPlantings.map(p => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.id}</TableCell>
-                  <TableCell>{p.cropId}</TableCell>
-                  <TableCell>{p.fieldId}</TableCell>
-                  <TableCell>{p.sowingDate}</TableCell>
-                  <TableCell>{p.expectedHarvest}</TableCell>
-                  <TableCell>
-                    <Button size="sm" onClick={() => handleEdit(p)}>Edit</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        </>
+      )}
 
       <PlantingEditor open={isOpen} planting={editing} onSave={handleSave} onClose={() => setIsOpen(false)} />
       <OperationEditor open={opOpen} operation={opEditing} onSave={handleSaveOperation} onClose={() => setOpOpen(false)} />
