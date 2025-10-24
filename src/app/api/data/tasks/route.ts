@@ -8,7 +8,7 @@ const FILE = path.join(DATA_DIR, 'tasks.json');
 async function ensureDataDir() {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
-  } catch (e) {
+  } catch {
     // ignore
   }
 }
@@ -18,7 +18,7 @@ export async function GET() {
   try {
     const raw = await fs.readFile(FILE, 'utf-8');
     return NextResponse.json(JSON.parse(raw));
-  } catch (e) {
+  } catch {
     return NextResponse.json([], { status: 200 });
   }
 }

@@ -111,7 +111,7 @@ export default function FeedFormulationPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {rows.map((row, index) => (
+            {rows.map((row) => (
               <div key={row.id} className="flex gap-2 items-end">
                 <div className="grid gap-2 flex-grow">
                   <Label htmlFor={`ingredient-${row.id}`}>Ingredient</Label>
