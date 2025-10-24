@@ -44,7 +44,7 @@ next-env.d.ts
 firebase-debug.log
 firestore-debug.log
 
-# dev server
+# Development server process files
 .devserver.log
 .devserver.pid
 .modified
