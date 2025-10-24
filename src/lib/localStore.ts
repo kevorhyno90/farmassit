@@ -11,7 +11,7 @@ export function loadData<T>(key: string, fallback: T): T {
     // support both browser and Node test env (globalThis.localStorage)
     const storage: Storage | undefined = (typeof window !== "undefined" && window.localStorage)
       ? window.localStorage
-      : (typeof globalThis !== "undefined" ? (globalThis as any).localStorage : undefined);
+      : (typeof globalThis !== "undefined" ? (globalThis as Record<string, unknown>).localStorage as Storage | undefined : undefined);
     if (!storage) return fallback;
     const raw = storage.getItem(key);
     if (!raw) return fallback;
@@ -26,7 +26,7 @@ export async function saveData<T>(key: string, data: T, resource?: string) {
   try {
     const storage: Storage | undefined = (typeof window !== "undefined" && window.localStorage)
       ? window.localStorage
-      : (typeof globalThis !== "undefined" ? (globalThis as any).localStorage : undefined);
+      : (typeof globalThis !== "undefined" ? (globalThis as Record<string, unknown>).localStorage as Storage | undefined : undefined);
     if (storage) {
       storage.setItem(key, JSON.stringify(data));
     }

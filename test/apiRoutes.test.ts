@@ -44,9 +44,9 @@ describe('file-backed API routes', () => {
   });
 
   const resources = [
-    '/workspaces/farmassit/src/app/api/data/plantings/route.ts',
-    '/workspaces/farmassit/src/app/api/data/operations/route.ts',
-    '/workspaces/farmassit/src/app/api/data/tasks/route.ts',
+    '/home/runner/work/farmassit/farmassit/src/app/api/data/plantings/route.ts',
+    '/home/runner/work/farmassit/farmassit/src/app/api/data/operations/route.ts',
+    '/home/runner/work/farmassit/farmassit/src/app/api/data/tasks/route.ts',
   ];
 
   for (const r of resources) {
