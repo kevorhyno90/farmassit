@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -17,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import CropsTopbar from "./CropsTopbar";
 import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, Pencil, PlusCircle, Sprout, Trash2, FileText, List } from "lucide-react";
 import { cropData, type Crop, fieldData as sampleFields, type Field, treatmentData as sampleTreatments, type Treatment } from "@/lib/data";
@@ -74,25 +76,55 @@ function exportCSV(crops: Crop[]) {
   URL.revokeObjectURL(url);
 }
 
-export default function CropsManager({ initialSection } : { initialSection?: string }) {
-  const [crops, setCrops] = useState<Crop[]>(() => loadData<Crop[]>(STORAGE_KEY, cropData));
+export default function CropsManager({ initialSection, onlySection } : { initialSection?: string, onlySection?: string }) {
+  // Start with empty arrays to avoid SSR/CSR hydration mismatches. We'll load stored data on mount.
+  const [crops, setCrops] = useState<Crop[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCrop, setEditingCrop] = useState<Crop | null>(null);
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0].id);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [fields, setFields] = useState<Field[]>(() => loadData<Field[]>(STORAGE_FIELDS, sampleFields));
-  const [treatments, setTreatments] = useState<Treatment[]>(() => loadData<Treatment[]>(STORAGE_TREATMENTS, sampleTreatments));
+  const [fields, setFields] = useState<Field[]>([]);
+  const [treatments, setTreatments] = useState<Treatment[]>([]);
+  const [varieties, setVarieties] = useState<string[]>([]);
+  const [tasks, setTasks] = useState<import('@/lib/data').FarmTask[]>([]);
+  type FarmTask = import('@/lib/data').FarmTask;
+  // Dialog state for editing varieties
+  const [isVarDialogOpen, setIsVarDialogOpen] = useState(false);
+  const [varEditing, setVarEditing] = useState<string | null>(null);
+  const [varFormValue, setVarFormValue] = useState('');
+  // Dialog state for editing tasks
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [taskEditing, setTaskEditing] = useState<FarmTask | null>(null);
+  const [taskForm, setTaskForm] = useState<{ task:string; dueDate:string; status:FarmTask['status']; assignee:string }>({ task: '', dueDate: '', status: 'Pending', assignee: '' });
 
-  // try remote load on mount
+  // Load stored data on client after mount. Doing this inside useEffect prevents server from rendering
+  // data that differs from the client initial render (avoids hydration mismatches).
   useEffect(() => {
     (async () => {
       try {
-        const remoteCrops = await loadDataRemote<Crop[]>("crops", cropData);
-        if (remoteCrops) setCrops(remoteCrops);
-        const remoteFields = await loadDataRemote<Field[]>("fields", sampleFields);
-        if (remoteFields) setFields(remoteFields);
-        const remoteTreat = await loadDataRemote<Treatment[]>("treatments", sampleTreatments);
-        if (remoteTreat) setTreatments(remoteTreat);
+        // first load from localStorage (fast)
+        const localCrops = loadData<Crop[]>(STORAGE_KEY, cropData);
+        setCrops(localCrops || cropData);
+  const localFields = loadData<Field[]>(STORAGE_FIELDS, sampleFields);
+  setFields(localFields || sampleFields);
+  const localTreat = loadData<Treatment[]>(STORAGE_TREATMENTS, sampleTreatments);
+  setTreatments(localTreat || sampleTreatments);
+  const localVar = loadData<string[]>('farmassit.varieties.v1', []);
+  setVarieties(localVar || []);
+  const localTasks = loadData<import('@/lib/data').FarmTask[]>('farmassit.tasks.v1', []);
+  setTasks(localTasks || []);
+
+        // then try server-backed remote data to override if available
+        try {
+          const remoteCrops = await loadDataRemote<Crop[]>("crops", null as any);
+          if (remoteCrops) setCrops(remoteCrops);
+          const remoteFields = await loadDataRemote<Field[]>("fields", null as any);
+          if (remoteFields) setFields(remoteFields);
+          const remoteTreat = await loadDataRemote<Treatment[]>("treatments", null as any);
+          if (remoteTreat) setTreatments(remoteTreat);
+        } catch (e) {
+          // ignore remote failures
+        }
       } catch (e) {
         // ignore
       }
@@ -101,6 +133,8 @@ export default function CropsManager({ initialSection } : { initialSection?: str
 
   useEffect(() => { saveData(STORAGE_FIELDS, fields, 'fields'); }, [fields]);
   useEffect(() => { saveData(STORAGE_TREATMENTS, treatments, 'treatments'); }, [treatments]);
+  useEffect(() => { saveData('farmassit.varieties.v1', varieties, 'varieties'); }, [varieties]);
+  useEffect(() => { saveData('farmassit.tasks.v1', tasks, 'tasks'); }, [tasks]);
   useEffect(() => { saveData(STORAGE_KEY, crops, 'crops'); }, [crops]);
 
   // If an initialSection prop is provided, scroll to it on mount
@@ -167,19 +201,29 @@ export default function CropsManager({ initialSection } : { initialSection?: str
   // Quick treatment modal
   const [quickTreatmentCrop, setQuickTreatmentCrop] = useState<string | null>(null);
   const [isQuickTreatmentOpen, setIsQuickTreatmentOpen] = useState(false);
+  // selection state for the crop form field select (so we can programmatically set it)
+  const [selectedFieldId, setSelectedFieldId] = useState<string | undefined>(undefined);
+  const [isAddFieldDialogOpenInline, setIsAddFieldDialogOpenInline] = useState(false);
+  const [newFieldForm, setNewFieldForm] = useState<{ name: string; areaHa: number; soilType: string }>({ name: '', areaHa: 0, soilType: '' });
 
   const handleAddNew = () => {
     setEditingCrop(null);
+    setSelectedFieldId(undefined);
     setIsDialogOpen(true);
   };
 
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+  // prefer controlled selectedFieldId when present (inline add may update it), otherwise read from form
+  const rawField = selectedFieldId ?? (formData.get("fieldId") as string | null);
+  const fieldId = rawField === "__UNASSIGNED__" ? undefined : (rawField || undefined);
+
     const newCropData: Crop = {
       id: (formData.get("id") as string) || `C${String(crops.length + 1).padStart(3, "0")}`,
       name: (formData.get("name") as string) || "",
       variety: (formData.get("variety") as string) || "",
+      fieldId: fieldId,
       plantingDate: (formData.get("plantingDate") as string) || "",
       stage: (formData.get("stage") as Crop["stage"]) || "Planted",
       expectedHarvest: (formData.get("expectedHarvest") as string) || "",
@@ -214,6 +258,11 @@ export default function CropsManager({ initialSection } : { initialSection?: str
   const [baseTemp, setBaseTemp] = useState<number>(10);
   const [avgTempOverride, setAvgTempOverride] = useState<number | null>(null);
 
+  // UI filters for plantings
+  const [plantingSearch, setPlantingSearch] = useState<string>('');
+  const [plantingFieldFilter, setPlantingFieldFilter] = useState<string | undefined>(undefined);
+  const [plantingStageFilter, setPlantingStageFilter] = useState<string | undefined>(undefined);
+
   const estimateGDD = (crop: Crop) => {
     try {
       const start = new Date(crop.plantingDate).getTime();
@@ -228,7 +277,31 @@ export default function CropsManager({ initialSection } : { initialSection?: str
     }
   }
 
+  const filteredCrops = useMemo(() => {
+    return crops.filter(c => {
+      if (plantingSearch) {
+        const s = plantingSearch.toLowerCase();
+        if (!(`${c.name} ${c.variety}`.toLowerCase().includes(s))) return false;
+      }
+      if (plantingFieldFilter && plantingFieldFilter !== '__ALL__') {
+        if ((c.fieldId || '__UNASSIGNED__') !== plantingFieldFilter) return false;
+      }
+      if (plantingStageFilter && plantingStageFilter !== '__ALL__') {
+        if (c.stage !== plantingStageFilter) return false;
+      }
+      return true;
+    });
+  }, [crops, plantingSearch, plantingFieldFilter, plantingStageFilter]);
+
   // Render helpers
+  const router = useRouter();
+
+  // navigate to a section route so the page opens that section (server route passes initialSection)
+  const navigateToSection = (id: string) => {
+    // push the app route /crops/<section>
+    router.push(`/crops/${id}`);
+  };
+
   const scrollToSection = (id: string) => {
     const el = sectionRefs.current[id];
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -236,47 +309,18 @@ export default function CropsManager({ initialSection } : { initialSection?: str
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Sprout className="h-5 w-5" />
-              Crop Management
-            </CardTitle>
-            <CardDescription>A toolkit for an agronomist to manage crop cycles and run reports.</CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-1">
-              {SECTIONS.map((s) => (
-                <Button key={s.id} variant={s.id === activeSection ? "default" : "ghost"} size="sm" onClick={() => scrollToSection(s.id)}>
-                  {s.label}
-                </Button>
-              ))}
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" className="md:hidden">
-                  <List className="h-4 w-4 mr-1" /> Sections
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuLabel>Sections</DropdownMenuLabel>
-                {SECTIONS.map(s => (
-                  <DropdownMenuItem key={s.id} onClick={() => scrollToSection(s.id)}>{s.label}</DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button size="sm" className="gap-1" onClick={handleAddNew}>
-              <PlusCircle className="h-4 w-4" /> Add New Crop
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => exportCSV(crops)}>
-              <FileText className="h-4 w-4 mr-1" /> Export CSV
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
+      <CropsTopbar active={activeSection} />
+      <div className="flex items-center justify-end gap-2">
+        <Button size="sm" className="gap-1" onClick={handleAddNew}>
+          <PlusCircle className="h-4 w-4" /> Add New Crop
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => exportCSV(crops)}>
+          <FileText className="h-4 w-4 mr-1" /> Export CSV
+        </Button>
+      </div>
 
-      {/* Overview */}
+    {/* Overview */}
+    {(!onlySection || onlySection === 'overview') && (
   <section id="overview" ref={(el) => { sectionRefs.current["overview"] = el; }} className="space-y-2">
         <h3 className="text-lg font-semibold">Overview</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -303,10 +347,12 @@ export default function CropsManager({ initialSection } : { initialSection?: str
             </CardContent>
           </Card>
         </div>
-      </section>
+  </section>
+  )}
 
-      {/* Fields - management */}
-      <section id="fields" ref={(el) => { sectionRefs.current["fields"] = el; }} className="space-y-2">
+  {/* Fields - management */}
+  {(!onlySection || onlySection === 'fields') && (
+  <section id="fields" ref={(el) => { sectionRefs.current["fields"] = el; }} className="space-y-2">
         <h3 className="text-lg font-semibold">Fields</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
@@ -340,23 +386,77 @@ export default function CropsManager({ initialSection } : { initialSection?: str
             </CardContent>
           </Card>
         </div>
-      </section>
+  </section>
+  )}
 
       {/* Varieties */}
+      {(!onlySection || onlySection === 'varieties') && (
   <section id="varieties" ref={(el) => { sectionRefs.current["varieties"] = el; }} className="space-y-2">
         <h3 className="text-lg font-semibold">Varieties</h3>
-        <Card>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Catalog of crop varieties. You can extend this list and link varieties to plantings.</p>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardContent>
+              <div className="mb-2 text-sm text-muted-foreground">Catalog of crop varieties</div>
+              <div className="space-y-2">
+                {varieties.map(v => (
+                  <div key={v} className="flex items-center justify-between gap-2 border rounded p-2">
+                    <div className="font-medium">{v}</div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => { setVarEditing(v); setVarFormValue(v); setIsVarDialogOpen(true); }}>Edit</Button>
+                      <Button size="sm" variant="destructive" onClick={() => { if (confirm('Delete variety?')) setVarieties(s => s.filter(x => x !== v)); }}>Delete</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <div className="mb-2 text-sm text-muted-foreground">Add new variety</div>
+              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const name = String(fd.get('name')||'').trim(); if (name) setVarieties(s => [...s, name]); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
+                <Input name="name" placeholder="Variety name" required />
+                <Button type="submit">Add Variety</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </section>
+      )}
 
       {/* Plantings table (main editable grid) */}
+  {(!onlySection || onlySection === 'plantings') && (
   <section id="plantings" ref={(el) => { sectionRefs.current["plantings"] = el; }} className="space-y-2">
         <h3 className="text-lg font-semibold">Plantings</h3>
         <Card>
           <CardContent>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2">
+                <Input placeholder="Search plantings" value={plantingSearch} onChange={(e) => setPlantingSearch(e.target.value)} />
+                <Select onValueChange={(v) => setPlantingFieldFilter(v === '__ALL__' ? undefined : v)}>
+                  <SelectTrigger><SelectValue placeholder="Field" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__ALL__">All fields</SelectItem>
+                    <SelectItem value="__UNASSIGNED__">Unassigned</SelectItem>
+                    {fields.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select onValueChange={(v) => setPlantingStageFilter(v === '__ALL__' ? undefined : v)}>
+                  <SelectTrigger><SelectValue placeholder="Stage" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__ALL__">All stages</SelectItem>
+                    <SelectItem value="Planted">Planted</SelectItem>
+                    <SelectItem value="Germination">Germination</SelectItem>
+                    <SelectItem value="Vegetative">Vegetative</SelectItem>
+                    <SelectItem value="Flowering">Flowering</SelectItem>
+                    <SelectItem value="Harvest">Harvest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => { setPlantingSearch(''); setPlantingFieldFilter(undefined); setPlantingStageFilter(undefined); }}>Clear</Button>
+              </div>
+            </div>
+            
             <Table>
               <TableHeader>
                 <TableRow>
@@ -369,7 +469,7 @@ export default function CropsManager({ initialSection } : { initialSection?: str
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {crops.map((crop) => (
+                {filteredCrops.map((crop) => (
                   <TableRow key={crop.id}>
                     <TableCell className="font-medium">{crop.name}</TableCell>
                     <TableCell className="hidden md:table-cell">{crop.variety}</TableCell>
@@ -399,18 +499,58 @@ export default function CropsManager({ initialSection } : { initialSection?: str
           </CardContent>
         </Card>
       </section>
+      )}
 
-      {/* Tasks placeholder */}
+    {/* Tasks placeholder */}
+    {(!onlySection || onlySection === 'tasks') && (
   <section id="tasks" ref={(el) => { sectionRefs.current["tasks"] = el; }} className="space-y-2">
         <h3 className="text-lg font-semibold">Tasks</h3>
-        <Card>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Task scheduling and assignment (placeholder). Integrate with farm tasks and equipment.</p>
-          </CardContent>
-        </Card>
-      </section>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardContent>
+              <div className="mb-2 text-sm text-muted-foreground">Tasks</div>
+              <div className="space-y-2">
+                {tasks.map(t => (
+                  <div key={t.id} className="flex items-center justify-between gap-2 border rounded p-2">
+                    <div>
+                      <div className="font-medium">{t.task}</div>
+                      <div className="text-xs text-muted-foreground">Due {t.dueDate} • {t.status} • {t.assignee}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => { setTaskEditing(t); setTaskForm({ task: t.task, dueDate: t.dueDate, status: t.status, assignee: t.assignee }); setIsTaskDialogOpen(true); }}>Edit</Button>
+                      <Button size="sm" onClick={() => { setTasks(s => s.map(x => x.id === t.id ? { ...x, status: x.status === 'Pending' ? 'In Progress' : x.status === 'In Progress' ? 'Completed' : 'Pending' } : x)); }}>{t.status === 'Completed' ? 'Reopen' : 'Advance'}</Button>
+                      <Button size="sm" variant="destructive" onClick={() => { if (confirm('Delete task?')) setTasks(s => s.filter(x => x.id !== t.id)); }}>Delete</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <div className="mb-2 text-sm text-muted-foreground">Add new task</div>
+              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t = { id: `T${String(tasks.length+1).padStart(3,'0')}`, task: String(fd.get('task')||''), dueDate: String(fd.get('dueDate')||''), status: (fd.get('status') as any) || 'Pending', assignee: String(fd.get('assignee')||'') }; setTasks(s => [...s, t]); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
+                <Input name="task" placeholder="Task name" required />
+                <Input name="dueDate" type="date" />
+                <Select name="status">
+                  <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input name="assignee" placeholder="Assignee" />
+                <Button type="submit">Add Task</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+  </section>
+  )}
 
       {/* Treatments */}
+      {(!onlySection || onlySection === 'treatments') && (
       <section id="treatments" ref={(el) => { sectionRefs.current["treatments"] = el; }} className="space-y-2">
         <h3 className="text-lg font-semibold">Treatments</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -455,8 +595,10 @@ export default function CropsManager({ initialSection } : { initialSection?: str
           </Card>
         </div>
       </section>
+      )}
 
       {/* Reports */}
+      {(!onlySection || onlySection === 'reports') && (
       <section id="reports" ref={(el) => { sectionRefs.current["reports"] = el; }} className="space-y-2">
         <h3 className="text-lg font-semibold">Reports</h3>
         <Card>
@@ -494,6 +636,7 @@ export default function CropsManager({ initialSection } : { initialSection?: str
           </CardContent>
         </Card>
       </section>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
@@ -513,13 +656,22 @@ export default function CropsManager({ initialSection } : { initialSection?: str
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="fieldId" className="text-right">Field</Label>
-                <Select name="fieldId" defaultValue={editingCrop?.fieldId}>
+                <Select name="fieldId" defaultValue={editingCrop?.fieldId ?? "__UNASSIGNED__"} onValueChange={(v) => {
+                    if (v === '__ADD_FIELD__') {
+                      setIsAddFieldDialogOpenInline(true);
+                    } else if (v === '__UNASSIGNED__') {
+                      setSelectedFieldId(undefined);
+                    } else {
+                      setSelectedFieldId(v);
+                    }
+                  }}>
                   <SelectTrigger className="col-span-3"><SelectValue placeholder="Assign field (optional)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="__UNASSIGNED__">Unassigned</SelectItem>
                     {fields.map(f => (
                       <SelectItem key={f.id} value={f.id}>{f.name} — {f.areaHa} ha</SelectItem>
                     ))}
+                    <SelectItem value="__ADD_FIELD__">+ Add new field...</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -578,6 +730,77 @@ export default function CropsManager({ initialSection } : { initialSection?: str
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { setIsQuickTreatmentOpen(false); setQuickTreatmentCrop(null); }}>Cancel</Button>
               <Button type="submit">Add</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {/* Variety edit dialog */}
+      <Dialog open={isVarDialogOpen} onOpenChange={setIsVarDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Variety</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); if (varEditing) { setVarieties(s => s.map(x => x === varEditing ? varFormValue : x)); } setVarEditing(null); setVarFormValue(''); setIsVarDialogOpen(false); }}>
+            <div className="grid gap-4 py-2">
+              <Input value={varFormValue} onChange={(e) => setVarFormValue(e.target.value)} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setIsVarDialogOpen(false); setVarEditing(null); setVarFormValue(''); }}>Cancel</Button>
+              <Button type="submit">Save</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task edit dialog */}
+      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); if (taskEditing) { setTasks(s => s.map(x => x.id === taskEditing.id ? { ...x, ...taskForm } : x)); } setTaskEditing(null); setTaskForm({ task: '', dueDate: '', status: 'Pending', assignee: '' }); setIsTaskDialogOpen(false); }}>
+            <div className="grid gap-2 py-2">
+              <Label>Task</Label>
+              <Input value={taskForm.task} onChange={(e) => setTaskForm(old => ({ ...old, task: e.target.value }))} />
+              <Label>Due date</Label>
+              <Input type="date" value={taskForm.dueDate} onChange={(e) => setTaskForm(old => ({ ...old, dueDate: e.target.value }))} />
+              <Label>Status</Label>
+              <Select value={taskForm.status} onValueChange={(v)=> setTaskForm(old => ({ ...old, status: v as FarmTask['status'] }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="In Progress">In Progress</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Label>Assignee</Label>
+              <Input value={taskForm.assignee} onChange={(e) => setTaskForm(old => ({ ...old, assignee: e.target.value }))} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setIsTaskDialogOpen(false); setTaskEditing(null); setTaskForm({ task: '', dueDate: '', status: 'Pending', assignee: '' }); }}>Cancel</Button>
+              <Button type="submit">Save</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {/* Inline Add Field dialog (opened from Field select) */}
+      <Dialog open={isAddFieldDialogOpenInline} onOpenChange={setIsAddFieldDialogOpenInline}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Field</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); const id = `F${String(fields.length+1).padStart(3,'0')}`; const f = { id, name: newFieldForm.name || `Field ${id}`, areaHa: Number(newFieldForm.areaHa)||0, soilType: newFieldForm.soilType }; setFields(s => [...s, f]); setSelectedFieldId(id); setNewFieldForm({ name: '', areaHa: 0, soilType: '' }); setIsAddFieldDialogOpenInline(false); }}>
+            <div className="grid gap-2">
+              <Label>Name</Label>
+              <Input value={newFieldForm.name} onChange={(e) => setNewFieldForm(old => ({ ...old, name: e.target.value }))} />
+              <Label>Area (ha)</Label>
+              <Input type="number" value={String(newFieldForm.areaHa)} onChange={(e) => setNewFieldForm(old => ({ ...old, areaHa: Number(e.target.value) }))} />
+              <Label>Soil type</Label>
+              <Input value={newFieldForm.soilType} onChange={(e) => setNewFieldForm(old => ({ ...old, soilType: e.target.value }))} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddFieldDialogOpenInline(false)}>Cancel</Button>
+              <Button type="submit">Add Field</Button>
             </DialogFooter>
           </form>
         </DialogContent>

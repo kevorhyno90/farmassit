@@ -27,6 +27,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { getWeatherAnalysis } from "./actions";
+import type { WeatherAnalysisState } from "./actions";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function SubmitButton() {
@@ -47,8 +48,8 @@ function SubmitButton() {
 }
 
 export default function WeatherPage() {
-  const initialState = {};
-  const [state, dispatch] = useFormState(getWeatherAnalysis, initialState);
+  const initialState: WeatherAnalysisState = {};
+  const [state, dispatch] = useFormState(getWeatherAnalysis, initialState as WeatherAnalysisState);
   const { pending } = useFormStatus();
 
   const farmTasks = [

@@ -1,6 +1,7 @@
 import React from "react";
 import AppSidebar from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import BackButton from "@/components/ui/back-button";
 
 export default function AppLayout({
   children,
@@ -13,7 +14,10 @@ export default function AppLayout({
         <AppSidebar />
       </div>
       <div className="flex flex-col">
-        <Header />
+        <div className="flex items-center gap-2 px-4 sm:px-6">
+          <BackButton />
+          <Header />
+        </div>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">
           {children}
         </main>

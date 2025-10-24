@@ -93,3 +93,147 @@ export const fieldData: Field[] = [
   { id: 'F001', name: 'North Field', areaHa: 12.5, soilType: 'Loam', notes: 'Good drainage' },
   { id: 'F002', name: 'South Field', areaHa: 8.0, soilType: 'Clay', notes: 'Irrigation required' },
 ];
+
+// Animal & clinical models
+export type Owner = {
+  id?: string;
+  name?: string;
+  contact?: string;
+};
+
+export type Animal = {
+  id: string;
+  tagId?: string; // EID/RFID
+  name?: string;
+  species: 'Cattle' | 'Sheep' | 'Pig' | 'Chicken' | 'Goat' | 'Other';
+  breed?: string;
+  sex?: 'M' | 'F' | 'Unknown';
+  dob?: string | null;
+  owner?: Owner;
+  location?: string; // field/pen
+  status?: 'Active' | 'Sold' | 'Deceased' | 'Transferred';
+  notes?: string;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+};
+
+export const animalData: Animal[] = [
+  { id: 'A001', tagId: 'EID-1001', name: 'Bessie', species: 'Cattle', breed: 'Holstein', sex: 'F', dob: '2020-03-12', owner: { id: 'O001', name: 'Farm Owner' }, location: 'North Field', status: 'Active', createdAt: '2024-01-01' },
+  { id: 'A002', tagId: 'EID-1002', name: 'Daisy', species: 'Cattle', breed: 'Jersey', sex: 'F', dob: '2021-05-22', owner: { id: 'O001', name: 'Farm Owner' }, location: 'South Field', status: 'Active', createdAt: '2024-01-02' },
+];
+
+export type Vitals = {
+  tempC?: number;
+  heartRate?: number;
+  respRate?: number;
+  weightKg?: number;
+  conditionScore?: number;
+};
+
+export type Diagnosis = {
+  code?: string;
+  description: string;
+  confidence?: number;
+};
+
+export type Visit = {
+  id: string;
+  animalId: string;
+  dateTime: string;
+  clinicianId?: string;
+  type?: 'Consult' | 'Surgery' | 'FollowUp' | 'Emergency' | 'Other';
+  reason?: string;
+  vitals?: Vitals;
+  diagnoses?: Diagnosis[];
+  notes?: string;
+  attachments?: string[]; // URIs
+  createdAt?: string;
+  createdBy?: string;
+};
+
+export const visitData: Visit[] = [
+  { id: 'V001', animalId: 'A001', dateTime: '2024-07-20T08:30:00Z', clinicianId: 'DR001', type: 'Consult', reason: 'Routine check', vitals: { tempC: 38.5, heartRate: 60 }, diagnoses: [{ description: 'Healthy' }], notes: 'No concerns.' },
+];
+
+// Agrivi-like models
+export type Application = {
+  id: string;
+  date: string;
+  inputId?: string; // link to inventory item
+  product?: string;
+  rate?: string;
+  areaHa?: number;
+  notes?: string;
+};
+
+export type Operation = {
+  id: string;
+  plantingId: string;
+  type: 'Sowing' | 'Irrigation' | 'Fertilization' | 'Pest Control' | 'Harvest' | 'Other';
+  plannedDate?: string;
+  performedDate?: string;
+  performedBy?: string;
+  applications?: Application[];
+  notes?: string;
+};
+
+export type Planting = {
+  id: string;
+  cropId: string; // link to Crop
+  fieldId: string;
+  variety?: string;
+  sowingDate?: string;
+  expectedHarvest?: string;
+  areaHa?: number;
+  status?: 'Planned' | 'Active' | 'Completed' | 'Cancelled';
+  operations?: Operation[];
+  yield?: YieldRecord | null;
+};
+
+export type YieldRecord = {
+  id: string;
+  plantingId: string;
+  date: string;
+  quantity: number;
+  unit: string;
+  notes?: string;
+};
+
+export const plantingData: Planting[] = [
+  {
+    id: 'P001',
+    cropId: 'C001',
+    fieldId: 'F001',
+    variety: 'Sweet Corn',
+    sowingDate: '2024-04-15',
+    expectedHarvest: '2024-07-25',
+    areaHa: 2.5,
+    status: 'Active',
+    operations: [
+      {
+        id: 'O001',
+        plantingId: 'P001',
+        type: 'Fertilization',
+        performedDate: '2024-05-01',
+        performedBy: 'John D.',
+        applications: [
+          { id: 'A001', date: '2024-05-01', product: 'NPK 10-10-10', rate: '50 kg/ha', areaHa: 2.5 }
+        ],
+      },
+    ],
+  },
+];
+
+export const operationData: Operation[] = [
+  {
+    id: 'O001',
+    plantingId: 'P001',
+    type: 'Fertilization',
+    performedDate: '2024-05-01',
+    performedBy: 'John D.',
+    applications: [{ id: 'A001', date: '2024-05-01', product: 'NPK 10-10-10', rate: '50 kg/ha', areaHa: 2.5 }],
+  },
+];
+
