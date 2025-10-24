@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { loadData, saveData } from "@/lib/localStore";
 import { plantingData as samplePlantings, type Planting } from "@/lib/data";
@@ -51,6 +52,18 @@ export default function PlantingsPage() {
   useEffect(() => { saveData('farmassit.plantings.v1', plantings, 'plantings'); }, [plantings]);
   useEffect(() => { saveData('farmassit.operations.v1', operations, 'operations'); }, [operations]);
 
+  const [query, setQuery] = useState('');
+
+  const filteredPlantings = plantings.filter((p) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      String(p.id).toLowerCase().includes(q) ||
+      String(p.cropId ?? '').toLowerCase().includes(q) ||
+      String(p.fieldId ?? '').toLowerCase().includes(q)
+    );
+  });
+
   const handleAdd = () => { setEditing(null); setIsOpen(true); };
   const handleEdit = (p: Planting) => { setEditing(p); setIsOpen(true); };
   const handleSave = (p: Planting) => { setPlantings(s => { const exists = s.find(x => x.id === p.id); if (exists) return s.map(x => x.id === p.id ? p : x); return [...s, p]; }); setIsOpen(false); };
@@ -70,9 +83,12 @@ export default function PlantingsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
-          <SimpleCalendar items={plantings.map(p => ({ id: p.id, date: p.sowingDate || p.expectedHarvest || '', title: p.cropId }))} onClickItem={(id) => { const p = plantings.find(x => x.id === id); if (p) handleEdit(p); }} />
-        </div>
+          <div className="md:col-span-2">
+            <div className="mb-3">
+              <Input placeholder="Search plantings by id, crop, or field..." value={query} onChange={(e) => setQuery((e.target as HTMLInputElement).value)} />
+            </div>
+            <SimpleCalendar items={filteredPlantings.map(p => ({ id: p.id, date: p.sowingDate || p.expectedHarvest || '', title: p.cropId }))} onClickItem={(id) => { const p = plantings.find(x => x.id === id); if (p) handleEdit(p); }} />
+          </div>
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold">Planned Operations</h3>
@@ -112,7 +128,7 @@ export default function PlantingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {plantings.map(p => (
+                {filteredPlantings.map(p => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.id}</TableCell>
                   <TableCell>{p.cropId}</TableCell>

@@ -33,7 +33,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -211,8 +210,8 @@ export default function CropsManager({ initialSection } : { initialSection?: str
   }, [crops, stagesCount]);
 
   // GDD calculation using user-provided base temperature and optional avg daily temp override
-  const [baseTemp, setBaseTemp] = useState<number>(10);
-  const [avgTempOverride, setAvgTempOverride] = useState<number | null>(null);
+  const [baseTemp] = useState<number>(10);
+  const [avgTempOverride] = useState<number | null>(null);
 
   const estimateGDD = (crop: Crop) => {
     try {
@@ -223,7 +222,7 @@ export default function CropsManager({ initialSection } : { initialSection?: str
       const avgDaily = avgTempOverride ?? 15; // default climatology average
       const dailyGdd = Math.max(0, avgDaily - baseTemp);
       return Math.round(days * dailyGdd);
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -435,7 +434,7 @@ export default function CropsManager({ initialSection } : { initialSection?: str
           <Card>
             <CardContent>
               <div className="mb-2 text-sm text-muted-foreground">Add new treatment</div>
-              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: (fd.get('type') as any) || 'Other', product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
+              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: String(fd.get('type') ?? 'Other') as Treatment['type'], product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
                 <Input name="date" type="date" required />
                 <Select name="type">
                   <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
@@ -559,7 +558,7 @@ export default function CropsManager({ initialSection } : { initialSection?: str
           <DialogHeader>
             <DialogTitle>Add Treatment</DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: (fd.get('type') as any) || 'Other', product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t, quickTreatmentCrop || undefined); setIsQuickTreatmentOpen(false); setQuickTreatmentCrop(null); }}>
+          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: String(fd.get('type') ?? 'Other') as Treatment['type'], product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t, quickTreatmentCrop || undefined); setIsQuickTreatmentOpen(false); setQuickTreatmentCrop(null); }}>
             <div className="grid gap-4 py-4">
               <Input name="date" type="date" required />
               <Select name="type">
