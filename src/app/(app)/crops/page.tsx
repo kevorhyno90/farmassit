@@ -1,6 +1,6 @@
-import React from "react";
-import CropsManager from "./CropsManager";
+import { redirect } from "next/navigation";
 
 export default function CropsPage() {
-  return <CropsManager />;
+  // Redirect to the overview section so each section has its own page
+  redirect("/crops/overview");
 }

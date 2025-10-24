@@ -12,7 +12,8 @@ export const weatherAnalysisSchema = z.object({
 export type WeatherAnalysisState = {
   suitabilityAnalysis?: string;
   recommendations?: string;
-  error?: string;
+  // zod fieldErrors are a map of field name to array of messages; allow either string or that shape
+  error?: string | Record<string, string[] | undefined>;
 };
 
 export async function getWeatherAnalysis(
