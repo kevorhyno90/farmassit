@@ -47,7 +47,7 @@ function SubmitButton() {
 }
 
 export default function WeatherPage() {
-  const initialState = {};
+  const initialState: { suitabilityAnalysis?: string; recommendations?: string; error?: string } = {};
   const [state, dispatch] = useFormState(getWeatherAnalysis, initialState);
   const { pending } = useFormStatus();
 

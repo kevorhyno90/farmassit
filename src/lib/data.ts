@@ -93,3 +93,31 @@ export const fieldData: Field[] = [
   { id: 'F001', name: 'North Field', areaHa: 12.5, soilType: 'Loam', notes: 'Good drainage' },
   { id: 'F002', name: 'South Field', areaHa: 8.0, soilType: 'Clay', notes: 'Irrigation required' },
 ];
+
+// Planting and Operation models
+export type Planting = {
+  id: string;
+  cropId: string;
+  fieldId?: string;
+  sowingDate?: string;
+  expectedHarvest?: string;
+  notes?: string;
+};
+
+export const plantingData: Planting[] = [
+  { id: 'P001', cropId: 'C001', fieldId: 'F001', sowingDate: '2024-04-15', expectedHarvest: '2024-07-25', notes: 'Spring planting' },
+  { id: 'P002', cropId: 'C002', fieldId: 'F002', sowingDate: '2024-05-01', expectedHarvest: '2024-08-10' },
+];
+
+export type Operation = {
+  id: string;
+  plantingId?: string;
+  type: string;
+  plannedDate?: string;
+  notes?: string;
+};
+
+export const operationData: Operation[] = [
+  { id: 'O001', plantingId: 'P001', type: 'Fertilize', plannedDate: '2024-05-01', notes: 'Apply NPK' },
+  { id: 'O002', plantingId: 'P002', type: 'Irrigation', plannedDate: '2024-05-15' },
+];
