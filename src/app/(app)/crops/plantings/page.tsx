@@ -109,10 +109,11 @@ export default function PlantingsPage() {
                 <CardContent>
                   <div className="mb-4">
                     <Input 
-                      placeholder="🔍 Search plantings by ID, crop, or field..." 
+                      placeholder="Search plantings by ID, crop, or field..." 
                       value={query} 
                       onChange={(e) => setQuery((e.target as HTMLInputElement).value)}
                       className="max-w-md"
+                      aria-label="Search plantings"
                     />
                   </div>
                   {filteredPlantings.length === 0 ? (

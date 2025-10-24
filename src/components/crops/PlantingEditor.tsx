@@ -41,13 +41,16 @@ export default function PlantingEditor({ open, planting, onSave, onClose }: Prop
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <input type="hidden" name="id" defaultValue={planting?.id} />
           <div className="grid gap-2">
-            <Label htmlFor="cropId">Crop ID <span className="text-destructive">*</span></Label>
+            <Label htmlFor="cropId">
+              Crop ID <span className="text-destructive" aria-label="required">*</span>
+            </Label>
             <Input 
               id="cropId" 
               name="cropId" 
               defaultValue={planting?.cropId} 
               placeholder="e.g., C001, Tomato" 
-              required 
+              required
+              aria-required="true"
             />
           </div>
           <div className="grid gap-2">

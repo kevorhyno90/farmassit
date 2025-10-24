@@ -40,13 +40,16 @@ export default function OperationEditor({ open, operation, onSave, onClose }: Pr
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <input type="hidden" name="id" defaultValue={operation?.id} />
           <div className="grid gap-2">
-            <Label htmlFor="type">Operation Type <span className="text-destructive">*</span></Label>
+            <Label htmlFor="type">
+              Operation Type <span className="text-destructive" aria-label="required">*</span>
+            </Label>
             <Input 
               id="type" 
               name="type" 
               defaultValue={operation?.type} 
               placeholder="e.g., Fertilize, Irrigation, Harvest" 
-              required 
+              required
+              aria-required="true"
             />
           </div>
           <div className="grid gap-2">
