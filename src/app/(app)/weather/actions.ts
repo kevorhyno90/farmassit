@@ -28,6 +28,7 @@ export async function getWeatherAnalysis(
   if (!validatedFields.success) {
     const flat = validatedFields.error.flatten().fieldErrors;
     const msg = Object.values(flat).flat().filter(Boolean).join("; ");
+    // return a structured error state for the caller
     return {
       error: msg || "Invalid input",
     };

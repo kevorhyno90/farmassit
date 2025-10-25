@@ -8,6 +8,8 @@ export type Crop = {
   // optional linkage to a field and treatment history
   fieldId?: string;
   treatments?: Treatment[];
+  // optional tasks assigned to this crop
+  tasks?: FarmTask[];
 };
 
 export const cropData: Crop[] = [

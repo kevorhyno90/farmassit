@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, Pencil, PlusCircle, Sprout, Trash2, FileText, List } from "lucide-react";
-import { cropData, type Crop, fieldData as sampleFields, type Field, treatmentData as sampleTreatments, type Treatment } from "@/lib/data";
+import { cropData, type Crop, fieldData as sampleFields, type Field, treatmentData as sampleTreatments, type Treatment, taskData as sampleTasks, type FarmTask } from "@/lib/data";
 import { loadData, saveData, loadDataRemote } from "@/lib/localStore";
 import {
   DropdownMenu,
@@ -60,6 +60,8 @@ const SECTIONS = [
 const STORAGE_KEY = "farmassit.crops.v1";
 const STORAGE_FIELDS = "farmassit.fields.v1";
 const STORAGE_TREATMENTS = "farmassit.treatments.v1";
+const STORAGE_TASKS = "farmassit.tasks.v1";
+const STORAGE_VARIETIES = "farmassit.varieties.v1";
 
 function exportCSV(crops: Crop[]) {
   const header = ["id", "name", "variety", "stage", "plantingDate", "expectedHarvest"];
@@ -82,6 +84,14 @@ export default function CropsManager({ initialSection } : { initialSection?: str
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [fields, setFields] = useState<Field[]>(() => loadData<Field[]>(STORAGE_FIELDS, sampleFields));
   const [treatments, setTreatments] = useState<Treatment[]>(() => loadData<Treatment[]>(STORAGE_TREATMENTS, sampleTreatments));
+  const [tasks, setTasks] = useState<FarmTask[]>(() => loadData<FarmTask[]>(STORAGE_TASKS, sampleTasks));
+
+  // derive an initial varieties list from sample data (unique) and persisted override
+  const initialVarieties = (() => {
+    const uniq = Array.from(new Set(cropData.map((c) => c.variety).filter(Boolean)));
+    return uniq.map((v, i) => ({ id: `V${String(i + 1).padStart(3, "0")}`, name: v }));
+  })();
+  const [varieties, setVarieties] = useState<{ id: string; name: string }[]>(() => loadData(STORAGE_VARIETIES, initialVarieties));
 
   // try remote load on mount
   useEffect(() => {
@@ -93,14 +103,16 @@ export default function CropsManager({ initialSection } : { initialSection?: str
         if (remoteFields) setFields(remoteFields);
         const remoteTreat = await loadDataRemote<Treatment[]>("treatments", sampleTreatments);
         if (remoteTreat) setTreatments(remoteTreat);
-      } catch (e) {
-        // ignore
+      } catch {
+        // ignore remote load errors
       }
     })();
   }, []);
 
   useEffect(() => { saveData(STORAGE_FIELDS, fields, 'fields'); }, [fields]);
   useEffect(() => { saveData(STORAGE_TREATMENTS, treatments, 'treatments'); }, [treatments]);
+  useEffect(() => { saveData(STORAGE_TASKS, tasks, 'tasks'); }, [tasks]);
+  useEffect(() => { saveData(STORAGE_VARIETIES, varieties, 'varieties'); }, [varieties]);
   useEffect(() => { saveData(STORAGE_KEY, crops, 'crops'); }, [crops]);
 
   // If an initialSection prop is provided, scroll to it on mount
@@ -143,6 +155,19 @@ export default function CropsManager({ initialSection } : { initialSection?: str
     });
   }
 
+  const handleAddVariety = (name: string) => {
+    setVarieties((s) => {
+      if (s.find((v) => v.name === name)) return s;
+      const id = `V${String(s.length + 1).padStart(3, "0")}`;
+      return [...s, { id, name }];
+    });
+  };
+
+  const handleDeleteVariety = (id: string) => {
+    if (!confirm('Delete variety? This will not change existing plantings.')) return;
+    setVarieties((s) => s.filter(v => v.id !== id));
+  }
+
   const handleDeleteField = (id: string) => {
     if (!confirm('Delete field? This will unset assigned field on crops.')) return;
     setFields((s) => s.filter(f => f.id !== id));
@@ -159,6 +184,26 @@ export default function CropsManager({ initialSection } : { initialSection?: str
     }
   }
 
+  const handleAddTask = (t: FarmTask, cropId?: string) => {
+    setTasks((s) => {
+      if (s.find(x => x.id === t.id)) return s.map(x => x.id === t.id ? t : x);
+      return [...s, t];
+    });
+    if (cropId) {
+      setCrops((s) => s.map(c => c.id === cropId ? { ...c, tasks: [...(c.tasks||[]), t] } : c));
+    }
+  }
+
+  const handleDeleteTask = (id: string) => {
+    if (!confirm('Delete task? This will remove it from the tasks list.')) return;
+    setTasks((s) => s.filter(t => t.id !== id));
+    setCrops((s) => s.map(c => ({ ...c, tasks: (c.tasks || []).filter(t => t.id !== id) })));
+  }
+
+  const handleToggleTaskStatus = (taskId: string) => {
+    setTasks((s) => s.map(t => t.id === taskId ? { ...t, status: t.status === 'Completed' ? 'Pending' : t.status === 'Pending' ? 'In Progress' : 'Completed' } : t));
+  }
+
   const handleEdit = (crop: Crop) => {
     setEditingCrop(crop);
     setIsDialogOpen(true);
@@ -167,6 +212,9 @@ export default function CropsManager({ initialSection } : { initialSection?: str
   // Quick treatment modal
   const [quickTreatmentCrop, setQuickTreatmentCrop] = useState<string | null>(null);
   const [isQuickTreatmentOpen, setIsQuickTreatmentOpen] = useState(false);
+  // Quick assign task modal
+  const [quickAssignCrop, setQuickAssignCrop] = useState<string | null>(null);
+  const [isQuickAssignOpen, setIsQuickAssignOpen] = useState(false);
 
   const handleAddNew = () => {
     setEditingCrop(null);
@@ -191,6 +239,10 @@ export default function CropsManager({ initialSection } : { initialSection?: str
       return [...s, newCropData];
     });
 
+    // If the variety is new, add it to the catalog
+    if (newCropData.variety && !varieties.find(v => v.name === newCropData.variety)) {
+      handleAddVariety(newCropData.variety);
+    }
     setEditingCrop(null);
     setIsDialogOpen(false);
   };
@@ -223,7 +275,7 @@ export default function CropsManager({ initialSection } : { initialSection?: str
       const avgDaily = avgTempOverride ?? 15; // default climatology average
       const dailyGdd = Math.max(0, avgDaily - baseTemp);
       return Math.round(days * dailyGdd);
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -347,7 +399,24 @@ export default function CropsManager({ initialSection } : { initialSection?: str
         <h3 className="text-lg font-semibold">Varieties</h3>
         <Card>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Catalog of crop varieties. You can extend this list and link varieties to plantings.</p>
+            <p className="text-sm text-muted-foreground">Catalog of crop varieties. Extend this list and link varieties to plantings. When saving a crop, unknown variety names will be added automatically to this catalog.</p>
+            <div className="mt-3 space-y-2">
+              {varieties.map(v => (
+                <div key={v.id} className="flex items-center justify-between gap-2 border rounded p-2">
+                  <div className="font-medium">{v.name}</div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => { const name = prompt('Edit variety', v.name); if (name) setVarieties(s => s.map(x => x.id === v.id ? { ...x, name } : x)); }}>Edit</Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleDeleteVariety(v.id)}>Delete</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="pt-3">
+              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const name = String(fd.get('name')||'').trim(); if (name) { handleAddVariety(name); (e.currentTarget as HTMLFormElement).reset(); } }} className="grid gap-2">
+                <Input name="name" placeholder="Variety name" />
+                <Button type="submit">Add Variety</Button>
+              </form>
+            </div>
           </CardContent>
         </Card>
       </section>
@@ -387,6 +456,7 @@ export default function CropsManager({ initialSection } : { initialSection?: str
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => handleEdit(crop)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setQuickAssignCrop(crop.id); setIsQuickAssignOpen(true); }}><List className="mr-2 h-4 w-4" /> Assign Task</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => { setQuickTreatmentCrop(crop.id); setIsQuickTreatmentOpen(true); }}><Sprout className="mr-2 h-4 w-4" /> Add Treatment</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(crop.id)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -405,7 +475,39 @@ export default function CropsManager({ initialSection } : { initialSection?: str
         <h3 className="text-lg font-semibold">Tasks</h3>
         <Card>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Task scheduling and assignment (placeholder). Integrate with farm tasks and equipment.</p>
+            <div className="mb-2 text-sm text-muted-foreground">Task scheduling and assignment. Create, edit and assign tasks to plantings.</div>
+            <div className="space-y-3">
+              {tasks.map(t => (
+                <div key={t.id} className="flex items-center justify-between gap-2 border rounded p-2">
+                  <div>
+                    <div className="font-medium">{t.task}</div>
+                    <div className="text-xs text-muted-foreground">Due {t.dueDate} • {t.assignee}</div>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <Badge variant={t.status === 'Completed' ? 'secondary' : 'outline'}>{t.status}</Badge>
+                    <Button size="sm" onClick={() => handleToggleTaskStatus(t.id)}>{t.status === 'Completed' ? 'Reopen' : 'Advance'}</Button>
+                    <Button size="sm" onClick={() => { const name = prompt('Edit task title', t.task); if (name) handleAddTask({ ...t, task: name }); }}>Edit</Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleDeleteTask(t.id)}>Delete</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="pt-4">
+              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: FarmTask = { id: `T${String(tasks.length+1).padStart(3,'0')}`, task: String(fd.get('task')||''), dueDate: String(fd.get('dueDate')||''), status: (fd.get('status') as FarmTask['status']) || 'Pending', assignee: String(fd.get('assignee')||'') }; handleAddTask(t); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
+                <Input name="task" placeholder="Task description" required />
+                <Input name="dueDate" type="date" />
+                <Input name="assignee" placeholder="Assignee" />
+                <Select name="status">
+                  <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button type="submit">Add Task</Button>
+              </form>
+            </div>
           </CardContent>
         </Card>
       </section>
@@ -435,7 +537,7 @@ export default function CropsManager({ initialSection } : { initialSection?: str
           <Card>
             <CardContent>
               <div className="mb-2 text-sm text-muted-foreground">Add new treatment</div>
-              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: (fd.get('type') as any) || 'Other', product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
+              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: (fd.get('type') as Treatment['type']) || 'Other', product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t); (e.currentTarget as HTMLFormElement).reset(); }} className="grid gap-2">
                 <Input name="date" type="date" required />
                 <Select name="type">
                   <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
@@ -553,13 +655,36 @@ export default function CropsManager({ initialSection } : { initialSection?: str
         </DialogContent>
       </Dialog>
 
+      {/* Quick assign task modal */}
+      <Dialog open={isQuickAssignOpen} onOpenChange={setIsQuickAssignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Task</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const taskId = String(fd.get('taskId')||''); const cropId = quickAssignCrop; if (!taskId || !cropId) return; const t = tasks.find(x => x.id === taskId); if (!t) return; handleAddTask(t, cropId); setIsQuickAssignOpen(false); setQuickAssignCrop(null); }}>
+            <div className="grid gap-4 py-4">
+              <Select name="taskId">
+                <SelectTrigger><SelectValue placeholder="Select task to assign" /></SelectTrigger>
+                <SelectContent>
+                  {tasks.map(t => (<SelectItem key={t.id} value={t.id}>{t.task} — {t.dueDate}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setIsQuickAssignOpen(false); setQuickAssignCrop(null); }}>Cancel</Button>
+              <Button type="submit">Assign</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Quick treatment modal */}
       <Dialog open={isQuickTreatmentOpen} onOpenChange={setIsQuickTreatmentOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Treatment</DialogTitle>
           </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: (fd.get('type') as any) || 'Other', product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t, quickTreatmentCrop || undefined); setIsQuickTreatmentOpen(false); setQuickTreatmentCrop(null); }}>
+          <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget as HTMLFormElement); const t: Treatment = { id: `TR${String(treatments.length+1).padStart(3,'0')}`, date: String(fd.get('date')||''), type: (fd.get('type') as Treatment['type']) || 'Other', product: String(fd.get('product')||''), rate: String(fd.get('rate')||''), notes: String(fd.get('notes')||'') }; handleAddTreatment(t, quickTreatmentCrop || undefined); setIsQuickTreatmentOpen(false); setQuickTreatmentCrop(null); }}>
             <div className="grid gap-4 py-4">
               <Input name="date" type="date" required />
               <Select name="type">

@@ -28,8 +28,8 @@ export default function PlantingsPage() {
           setPlantings(data);
           return;
         }
-      } catch (e) {
-        // fallback
+      } catch {
+        // fallback to local storage
       }
       setPlantings(loadData<Planting[]>('farmassit.plantings.v1', samplePlantings));
     })();
@@ -41,8 +41,8 @@ export default function PlantingsPage() {
           setOperations(data);
           return;
         }
-      } catch (e) {
-        // fallback
+      } catch {
+        // fallback to local storage
       }
       setOperations(loadData<Operation[]>('farmassit.operations.v1', sampleOperations));
     })();
