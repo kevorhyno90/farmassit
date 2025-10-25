@@ -1,0 +1,30 @@
+
+> nextn@0.1.0 dev
+> next dev --turbopack -p 9002
+
+   ▲ Next.js 15.5.6 (Turbopack)
+   - Local:        http://localhost:9002
+   - Network:      http://10.0.1.60:9002
+
+ ✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+ ✓ Ready in 4.9s
+ ○ Compiling / ...
+ ✓ Compiled / in 8.9s
+ GET / 307 in 10149ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1667ms
+ GET /dashboard 200 in 1971ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 734ms
+ GET /favicon.ico?favicon.7ed73651.ico 200 in 1117ms
+ ✓ Compiled /api/data/plantings in 180ms
+ HEAD /api/data/plantings 200 in 445ms
+ ✓ Compiled /api/data/operations in 171ms
+ HEAD /api/data/operations 200 in 431ms
+ ✓ Compiled /api/data/tasks in 173ms
+ HEAD /api/data/tasks 200 in 439ms

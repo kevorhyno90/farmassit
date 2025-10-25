@@ -3,7 +3,7 @@ import path from 'path';
 import { NextResponse } from 'next/server';
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
-const FILE = path.join(DATA_DIR, 'treatments.json');
+const FILE = path.join(DATA_DIR, 'operations.json');
 
 async function ensureDataDir() {
   try {
